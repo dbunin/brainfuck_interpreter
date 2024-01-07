@@ -10,98 +10,62 @@ enum Operator {
     DecValue,
     Output,
     Input,
-    JumpForward,
-    JumpBackwards,
+    Loop(Vec<Operator>),
 }
 
-// TODO Change to enum, with operand only being there for jump back?
-#[derive(Debug, Clone)]
-struct Instruction(Operator, u32);
-
-fn interpret(input: String) -> Vec<Instruction> {
+fn interpret(input: String) -> Vec<Operator> {
     let mut instructions = Vec::new();
     let mut pointer = 0;
-    let mut jump_stack: Vec<u32> = Vec::new();
+    let mut jump_stack: Vec<usize> = Vec::new();
 
     for c in input.chars() {
         match c {
-            '>' => instructions.push(Instruction(Operator::IncDataPointer, 0)),
-            '<' => instructions.push(Instruction(Operator::DecDataPointer, 0)),
-            '+' => instructions.push(Instruction(Operator::IncValue, 0)),
-            '-' => instructions.push(Instruction(Operator::DecValue, 0)),
-            '.' => instructions.push(Instruction(Operator::Output, 0)),
-            ',' => instructions.push(Instruction(Operator::Input, 0)),
+            '>' => instructions.push(Operator::IncDataPointer),
+            '<' => instructions.push(Operator::DecDataPointer),
+            '+' => instructions.push(Operator::IncValue),
+            '-' => instructions.push(Operator::DecValue),
+            '.' => instructions.push(Operator::Output),
+            ',' => instructions.push(Operator::Input),
             '[' => {
-                instructions.push(Instruction(Operator::JumpForward, 0));
-                jump_stack.push(pointer)
+                jump_stack.push(pointer);
+                pointer -= 1;
             }
             ']' => {
-                if jump_stack.len() == 0 {
-                    panic!("Compilation error")
-                }
-                let jump_pointer = jump_stack[jump_stack.len() - 1];
-                jump_stack.remove(jump_stack.len() - 1);
-                instructions.push(Instruction(Operator::JumpBackwards, jump_pointer));
-                let Instruction(operator, _) = &instructions[jump_pointer as usize];
-                instructions[jump_pointer as usize] = Instruction(operator.clone(), pointer.clone())
+                let jump_pointer = jump_stack.pop().expect("Compilation error");
+                let loop_instructions = instructions[jump_pointer..].to_vec();
+                instructions.push(Operator::Loop(loop_instructions));
             }
-            _ => pointer = pointer - 1, // ignore comments
+            _ => pointer -= 1, // ignore comments
         }
-        pointer = pointer + 1
+        pointer += 1;
     }
 
     return instructions;
 }
 
-fn execute(instructions: Vec<Instruction>) {
-    let mut tape: [i16; 66666] = [0; 66666];
-    let mut data_pointer = 0;
-
-    let mut pointer = 0;
-    while pointer < instructions.len() {
-        let instruction = &instructions[pointer];
-
-        match instruction {
-            Instruction(Operator::IncDataPointer, _) => {
-                data_pointer = data_pointer + 1;
+fn execute(tape: &mut [u8; 1024], data_pointer: &mut usize, operators: Vec<Operator>) {
+    for operator in operators.iter() {
+        match operator {
+            Operator::IncDataPointer => *data_pointer += 1,
+            Operator::DecDataPointer => *data_pointer -= 1,
+            Operator::IncValue => tape[*data_pointer] += 1,
+            Operator::DecValue => tape[*data_pointer] -= 1,
+            Operator::Output => {
+                print!("{}", tape[*data_pointer] as char);
             }
-            Instruction(Operator::DecDataPointer, _) => {
-                data_pointer = data_pointer - 1;
-            }
-            Instruction(Operator::IncValue, _) => {
-                let value = tape[data_pointer];
-                tape[data_pointer] = value + 1;
-            }
-            Instruction(Operator::DecValue, _) => {
-                let value = tape[data_pointer];
-                tape[data_pointer] = value - 1;
-            }
-            Instruction(Operator::Output, _) => {
-                let character = char::from_u32(tape[data_pointer] as u32);
-                match character {
-                    Some(c) => print!("{}", c),
-                    None => panic!("Unexpected u32 {}", tape[data_pointer]),
-                }
-            }
-            Instruction(Operator::Input, _) => {
+            Operator::Input => {
                 let mut input: [u8; 1] = [0; 1];
                 std::io::stdin()
                     .read_exact(&mut input)
                     .expect("failed to read stdin");
-                tape[data_pointer] = input[0] as i16;
+                tape[*data_pointer] = input[0];
             }
-            Instruction(Operator::JumpForward, operand) => {
-                if tape[data_pointer] == 0 {
-                    pointer = *operand as usize;
-                }
-            }
-            Instruction(Operator::JumpBackwards, operand) => {
-                if tape[data_pointer] > 0 {
-                    pointer = *operand as usize;
+            Operator::Loop(loop_operators) => {
+                while tape[*data_pointer] != 0 {
+                    execute(tape, data_pointer, loop_operators.to_vec());
                 }
             }
         }
-        pointer = pointer + 1;
     }
 }
 
@@ -118,5 +82,7 @@ fn main() {
 
     let instructions = interpret(source);
 
-    execute(instructions);
+    let mut tape = [0; 1024];
+    let mut data_pointer = 124;
+    execute(&mut tape, &mut data_pointer, instructions);
 }

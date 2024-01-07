@@ -5,5 +5,5 @@ Basic [Brainfuck](http://en.wikipedia.org/wiki/Brainfuck) interpreter written in
 ## Usage
 
 ```bash
-cargo run --release helloworld.bf
+cargo run --release sample/helloworld.bf
 ```
