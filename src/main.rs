@@ -15,7 +15,6 @@ enum Operator {
 
 fn interpret(input: String) -> Vec<Operator> {
     let mut instructions = Vec::new();
-    let mut pointer = 0;
     let mut jump_stack: Vec<usize> = Vec::new();
 
     for c in input.chars() {
@@ -27,17 +26,15 @@ fn interpret(input: String) -> Vec<Operator> {
             '.' => instructions.push(Operator::Output),
             ',' => instructions.push(Operator::Input),
             '[' => {
-                jump_stack.push(pointer);
-                pointer -= 1;
+                jump_stack.push(instructions.len());
             }
             ']' => {
                 let jump_pointer = jump_stack.pop().expect("Compilation error");
                 let loop_instructions = instructions[jump_pointer..].to_vec();
                 instructions.push(Operator::Loop(loop_instructions));
             }
-            _ => pointer -= 1, // ignore comments
+            _ => (), // comments are ignored
         }
-        pointer += 1;
     }
 
     return instructions;
