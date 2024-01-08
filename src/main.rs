@@ -15,23 +15,52 @@ enum Operator {
 
 fn interpret(input: String) -> Vec<Operator> {
     let mut instructions = Vec::new();
-    let mut jump_stack: Vec<usize> = Vec::new();
+    let mut jump_stack: Vec<Vec<Operator>> = Vec::new();
 
     for c in input.chars() {
-        match c {
-            '>' => instructions.push(Operator::IncDataPointer),
-            '<' => instructions.push(Operator::DecDataPointer),
-            '+' => instructions.push(Operator::IncValue),
-            '-' => instructions.push(Operator::DecValue),
-            '.' => instructions.push(Operator::Output),
-            ',' => instructions.push(Operator::Input),
-            '[' => {
-                jump_stack.push(instructions.len());
-            }
-            ']' => {
-                let jump_pointer = jump_stack.pop().expect("Compilation error");
-                let loop_instructions = instructions[jump_pointer..].to_vec();
+        match (c, jump_stack.len()) {
+            ('>', 0) => instructions.push(Operator::IncDataPointer),
+            ('>', _) => jump_stack
+                .last_mut()
+                .expect("Compilation error")
+                .push(Operator::IncDataPointer),
+            ('<', 0) => instructions.push(Operator::DecDataPointer),
+            ('<', _) => jump_stack
+                .last_mut()
+                .expect("Compilation error")
+                .push(Operator::DecDataPointer),
+            ('+', 0) => instructions.push(Operator::IncValue),
+            ('+', _) => jump_stack
+                .last_mut()
+                .expect("Compilation error")
+                .push(Operator::IncValue),
+            ('-', 0) => instructions.push(Operator::DecValue),
+            ('-', _) => jump_stack
+                .last_mut()
+                .expect("Compilation error")
+                .push(Operator::DecValue),
+            ('.', 0) => instructions.push(Operator::Output),
+            ('.', _) => jump_stack
+                .last_mut()
+                .expect("Compilation error")
+                .push(Operator::Output),
+            (',', 0) => instructions.push(Operator::Input),
+            (',', _) => jump_stack
+                .last_mut()
+                .expect("Compilation error")
+                .push(Operator::Input),
+            ('[', _) => jump_stack.push(Vec::new()),
+
+            (']', 0 | 1) => {
+                let loop_instructions = jump_stack.pop().expect("Compilation error");
                 instructions.push(Operator::Loop(loop_instructions));
+            }
+            (']', _) => {
+                let loop_instructions = jump_stack.pop().expect("Compilation error");
+                jump_stack
+                    .last_mut()
+                    .expect("Compilation error")
+                    .push(Operator::Loop(loop_instructions));
             }
             _ => (), // comments are ignored
         }
